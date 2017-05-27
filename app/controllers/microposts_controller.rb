@@ -6,10 +6,10 @@ class MicropostsController < ApplicationController
     @micropost = current_user.microposts.build(micropost_params)
     if @micropost.save
       flash[:success] = "Micropost created!"
-      redirect_to root_url
+      redirect_to root_url  # redirect_toはGETリクエストを実行する
     else
-      @feed_items = []
-      render 'static_pages/home'
+      @feed_items = []  # == current_user.feed.paginate(page; params[:page]) ←Preferred
+      render 'static_pages/home'  #renderにするとリクエストが走らない⇒過去のエラーを含むコンテキストを残すことができる
     end
   end
 

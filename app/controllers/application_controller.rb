@@ -4,7 +4,7 @@ class ApplicationController < ActionController::Base
   
   private
 
-    # ユーザーのログインを確認する
+    # ユーザーのログインを確認する ※ここで定義することでApplicationControllerを継承しているMicropostsCotrollerやUserContollerでも使用できる
     def logged_in_user
       unless logged_in?
         store_location

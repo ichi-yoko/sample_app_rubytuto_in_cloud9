@@ -9,6 +9,20 @@ class User < ApplicationRecord
     # end
   has_many :microposts, dependent: :destroy # モデル同士をを関連付けるhas_manyとbelong_toは対で一緒に使用
   
+  # ※active_relationshipsという名称はなんでもよい。この名称がメソッド名となる。
+  has_many :active_relationships, class_name:  "Relationship",
+                                  foreign_key: "follower_id",
+                                  dependent:   :destroy
+  has_many :passive_relationships, class_name:  "Relationship",
+                                   foreign_key: "followed_id",
+                                   dependent:   :destroy
+  # User.first.active_relationships.map(&:followed)を使わなくても
+  # 以下のhas_manyがあればUser.first.followingで取得できる
+  # followingとしているのは、following_idを探しに行かせるから
+  # もしここをhogeにするとhoge_idはありませんというエラーになる。
+  has_many :following, through: :active_relationships, source: :followed  # sourceの後はUser.rbのbelongs_toで定義したものを指定する
+  has_many :followers, through: :passive_relationships, source: :follower
+  
   before_save { self.email = email.downcase }   # 保存する直前に実行される
   
   validates :name,  presence: true, length: { maximum: 50 }
@@ -53,7 +67,33 @@ class User < ApplicationRecord
   # 試作feedの定義
   # 完全な実装は次章の「ユーザーをフォローする」を参照
   def feed
-    Micropost.where("user_id = ?", id)
+    # Micropost.where("user_id = ?", self.id)
+    
+    # これだとフォローしているユーザー数が多いときに処理が遅くなってしまう
+    # Micropost.where("user_id IN (?) OR user_id = ?", following_ids, id)
+    
+    # Micropost.where("user_id IN (:following_ids) OR user_id = :user_id",
+    # following_ids: following_ids, user_id: id)
+     
+    following_ids = "SELECT followed_id FROM relationships
+                     WHERE follower_id = :user_id"
+    Micropost.where("user_id IN (#{following_ids})
+                     OR user_id = :user_id", user_id: id)
+  end
+  
+  # ユーザーをフォローする
+  def follow(other_user)
+    self.active_relationships.create(followed_id: other_user.id)
+  end
+
+  # ユーザーをフォロー解除する
+  def unfollow(other_user)
+    self.active_relationships.find_by(followed_id: other_user.id).destroy
+  end
+
+  # 現在のユーザーがフォローしてたらtrueを返す
+  def following?(other_user)
+    self.following.include?(other_user)
   end
   
 end
