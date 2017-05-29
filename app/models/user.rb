@@ -1,5 +1,5 @@
 class User < ApplicationRecord
-  attr_accessor :remember_token
+  attr_accessor :remember_token, :activation_token
     # <Getter & Setter>
     # def remember_token
     #   @token
@@ -7,6 +7,11 @@ class User < ApplicationRecord
     # def remember_token=(str)
     #   @token = str
     # end
+  
+  # before_save { self.email = email.downcase }   # 保存する直前に実行される
+  before_save   :downcase_email
+  before_create :create_activation_digest  # sign upの時にこの処理が走る
+  
   has_many :microposts, dependent: :destroy # モデル同士をを関連付けるhas_manyとbelong_toは対で一緒に使用
   
   # ※active_relationshipsという名称はなんでもよい。この名称がメソッド名となる。
@@ -22,8 +27,6 @@ class User < ApplicationRecord
   # もしここをhogeにするとhoge_idはありませんというエラーになる。
   has_many :following, through: :active_relationships, source: :followed  # sourceの後はUser.rbのbelongs_toで定義したものを指定する
   has_many :followers, through: :passive_relationships, source: :follower
-  
-  before_save { self.email = email.downcase }   # 保存する直前に実行される
   
   validates :name,  presence: true, length: { maximum: 50 }
   VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i  # 正規表現を定数に宣言
@@ -54,9 +57,15 @@ class User < ApplicationRecord
   
   # 渡されたトークンがダイジェストと一致したらtrueを返す
   # ユーザーIDとパスワードで認証していたauthenticateも同じことをしている
-  def authenticated?(remember_token)
-    return false if remember_digest.nil?
-    BCrypt::Password.new(self.remember_digest).is_password?(remember_token) # ここのselfは省略可能
+  # def authenticated?(remember_token)
+  #   return false if remember_digest.nil?
+  #   BCrypt::Password.new(self.remember_digest).is_password?(remember_token) # ここのselfは省略可能
+  # end
+  # トークンがダイジェストと一致したらtrueを返す
+  def authenticated?(attribute, token)
+    digest = send("#{attribute}_digest")  # モデル内にあるのでselfは省略することもできる
+    return false if digest.nil?
+    BCrypt::Password.new(digest).is_password?(token)
   end
   
   # ユーザーのログイン情報を破棄する
@@ -96,4 +105,27 @@ class User < ApplicationRecord
     self.following.include?(other_user)
   end
   
+  # アカウントを有効にする
+  def activate
+    update_attribute(:activated,    true)
+    update_attribute(:activated_at, Time.zone.now)
+  end
+
+  # 有効化用のメールを送信する
+  def send_activation_email
+    UserMailer.account_activation(self).deliver_now
+  end
+  
+  private
+
+    # メールアドレスをすべて小文字にする
+    def downcase_email
+      self.email = email.downcase
+    end
+
+    # 有効化トークンとダイジェストを作成および代入する
+    def create_activation_digest
+      self.activation_token  = User.new_token # 仮想のactivation_tokenにまずは保存。ここに保存したものはユーザーのメールに含まれる
+      self.activation_digest = User.digest(activation_token)  # 実態を持つところに保存。ハッシュ化したものを保存したのでこれでユーザーに教えたトークンは忘れられる。
+    end
 end
