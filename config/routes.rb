@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  get 'password_resets/new'
+
+  get 'password_resets/edit'
+
   get    'sessions/new'
 
   get    'users/new'
@@ -21,7 +25,9 @@ Rails.application.routes.draw do
     end
   end
   
-  resources :account_activations, only: [:edit] # 後で増やすかもしれないので上のようにばらばらに定義するのではなくresoucesでeditのみを指定しておく
+  # 後で増やすかもしれないので上のようにばらばらに定義するのではなくresoucesでeditのみを指定
+  resources :account_activations, only: [:edit] 
+  
   resources :password_resets,     only: [:new, :create, :edit, :update]
   resources :microposts,          only: [:create, :destroy]
   resources :relationships,       only: [:create, :destroy]
